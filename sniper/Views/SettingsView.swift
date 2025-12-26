@@ -15,28 +15,12 @@ struct SettingsView: View {
     @AppStorage("aiEnhancementEnabled") private var aiEnhancementEnabled: Bool = false
     @AppStorage("globalShortcut") private var globalShortcut: KeyboardShortcut = KeyboardShortcut.default
     
-    @State private var isLoading = true
-    
     var body: some View {
-        Group {
-            if isLoading {
-                VStack {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Text("Loading Settings...")
-                        .padding(.top)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                settingsContent
+        settingsContent
+            .onAppear {
+                // Ensure settings are properly initialized
+                print("SettingsView: Loaded with language: \(ocrLanguage), format: \(defaultOutputFormat)")
             }
-        }
-        .onAppear {
-            // Small delay to ensure everything is initialized
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isLoading = false
-            }
-        }
     }
     
     private var settingsContent: some View {

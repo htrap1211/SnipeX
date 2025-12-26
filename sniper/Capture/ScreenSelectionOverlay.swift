@@ -9,6 +9,13 @@ import SwiftUI
 import AppKit
 import ScreenCaptureKit
 
+// Custom window class that can become key window
+class ScreenSelectionWindow: NSWindow {
+    override var canBecomeKey: Bool { return true }
+    override var canBecomeMain: Bool { return true }
+    override var acceptsFirstResponder: Bool { return true }
+}
+
 // TextSniper-style approach: capture entire screen, then let user select region
 class ScreenSelectionWindowManager {
     static let shared = ScreenSelectionWindowManager()
@@ -18,24 +25,44 @@ class ScreenSelectionWindowManager {
     private init() {}
     
     func showSelectionWindow(onRegionSelected: @escaping (CaptureRegion) -> Void, onCancelled: @escaping () -> Void) {
+        print("ScreenSelectionWindowManager: showSelectionWindow called")
+        
+        // Ensure we're on the main thread
         DispatchQueue.main.async {
-            Task {
-                await self.captureScreenThenSelect(onRegionSelected: onRegionSelected, onCancelled: onCancelled)
+            // Add a small delay to ensure the app is fully initialized
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                Task {
+                    await self.captureScreenThenSelect(onRegionSelected: onRegionSelected, onCancelled: onCancelled)
+                }
             }
         }
     }
     
     private func captureScreenThenSelect(onRegionSelected: @escaping (CaptureRegion) -> Void, onCancelled: @escaping () -> Void) async {
         guard let screen = NSScreen.main else {
+            print("ScreenSelectionWindowManager: No main screen found")
             onCancelled()
             return
         }
         
+        print("ScreenSelectionWindowManager: Starting capture process for screen: \(screen.frame)")
+        
         do {
             // Step 1: Capture the entire screen using ScreenCaptureKit
-            let screenImage = try await captureEntireScreen()
+            let screenImage: CGImage
+            
+            if #available(macOS 12.3, *) {
+                screenImage = try await captureEntireScreen()
+            } else {
+                // Fallback for older macOS versions
+                print("ScreenSelectionWindowManager: Using fallback capture for macOS < 12.3")
+                throw CaptureError.unsupportedOS
+            }
+            
             let nsImage = NSImage(cgImage: screenImage, size: screen.frame.size)
             self.capturedImage = nsImage
+            
+            print("ScreenSelectionWindowManager: Screen captured successfully, showing selection overlay")
             
             // Step 2: Show selection overlay on top of the captured image
             DispatchQueue.main.async {
@@ -47,37 +74,84 @@ class ScreenSelectionWindowManager {
                 )
             }
         } catch {
-            print("Failed to capture screen: \(error)")
+            print("ScreenSelectionWindowManager: Failed to capture screen: \(error)")
+            
+            // Show a more user-friendly error
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Screen Capture Failed"
+                
+                if error is CaptureError {
+                    alert.informativeText = (error as! CaptureError).localizedDescription
+                } else {
+                    alert.informativeText = "Unable to capture screen. Please check screen recording permissions in System Preferences > Security & Privacy > Privacy > Screen Recording."
+                }
+                
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.addButton(withTitle: "Open System Preferences")
+                
+                let response = alert.runModal()
+                if response == .alertSecondButtonReturn {
+                    // Open System Preferences to Screen Recording
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+            
             onCancelled()
         }
     }
     
     @available(macOS 12.3, *)
     private func captureEntireScreen() async throws -> CGImage {
-        // Get available content
-        let availableContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        print("ScreenSelectionWindowManager: Starting entire screen capture")
         
-        // Get the main display
-        guard let display = availableContent.displays.first else {
-            throw CaptureError.displayNotFound
+        do {
+            // Get available content
+            print("ScreenSelectionWindowManager: Getting shareable content")
+            let availableContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            print("ScreenSelectionWindowManager: Found \(availableContent.displays.count) displays")
+            
+            // Get the main display
+            guard let display = availableContent.displays.first else {
+                print("ScreenSelectionWindowManager: No displays found")
+                throw CaptureError.displayNotFound
+            }
+            
+            print("ScreenSelectionWindowManager: Using display \(display.displayID), size: \(display.width)x\(display.height)")
+            
+            // Configure the capture for entire screen
+            let filter = SCContentFilter(display: display, excludingWindows: [])
+            
+            let configuration = SCStreamConfiguration()
+            configuration.width = Int(display.width)
+            configuration.height = Int(display.height)
+            configuration.showsCursor = false
+            configuration.capturesAudio = false
+            
+            print("ScreenSelectionWindowManager: Configuration set, performing capture")
+            
+            // Perform the capture
+            let image = try await SCScreenshotManager.captureImage(
+                contentFilter: filter,
+                configuration: configuration
+            )
+            
+            print("ScreenSelectionWindowManager: Screen capture successful, image size: \(image.width)x\(image.height)")
+            return image
+            
+        } catch {
+            print("ScreenSelectionWindowManager: Screen capture failed: \(error)")
+            
+            // Log more details about the error
+            if let scError = error as? SCStreamError {
+                print("ScreenSelectionWindowManager: SCStreamError code: \(scError.code), description: \(scError.localizedDescription)")
+            }
+            
+            throw error
         }
-        
-        // Configure the capture for entire screen
-        let filter = SCContentFilter(display: display, excludingWindows: [])
-        
-        let configuration = SCStreamConfiguration()
-        configuration.width = Int(display.width)
-        configuration.height = Int(display.height)
-        configuration.showsCursor = false
-        configuration.capturesAudio = false
-        
-        // Perform the capture
-        let image = try await SCScreenshotManager.captureImage(
-            contentFilter: filter,
-            configuration: configuration
-        )
-        
-        return image
     }
     
     private func showSelectionOverlay(
@@ -86,24 +160,28 @@ class ScreenSelectionWindowManager {
         onRegionSelected: @escaping (CaptureRegion) -> Void,
         onCancelled: @escaping () -> Void
     ) {
+        print("ScreenSelectionWindowManager: Creating selection overlay window")
+        
         // Close any existing window
         hideSelectionWindow()
         
-        // Create a simple window that covers the screen
-        let window = NSWindow(
+        // Create a custom window that can become key
+        let window = ScreenSelectionWindow(
             contentRect: screen.frame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         
-        // Configure window
+        // Configure window to properly receive input
         window.level = .screenSaver
         window.backgroundColor = NSColor.clear
         window.isOpaque = false
         window.ignoresMouseEvents = false
         window.acceptsMouseMovedEvents = true
         window.hasShadow = false
+        window.canHide = false
+        window.hidesOnDeactivate = false
         
         // Create the selection view
         let selectionView = TextSniperStyleSelectionView(
@@ -112,20 +190,28 @@ class ScreenSelectionWindowManager {
         )
         
         selectionView.onRegionSelected = { [weak self] region in
+            print("ScreenSelectionWindowManager: Region selected: \(region.rect)")
             self?.hideSelectionWindow()
             onRegionSelected(region)
         }
         
         selectionView.onCancelled = { [weak self] in
+            print("ScreenSelectionWindowManager: Selection cancelled")
             self?.hideSelectionWindow()
             onCancelled()
         }
         
         window.contentView = selectionView
+        
+        // Show the window with proper ordering
         window.orderFrontRegardless()
         
         // Make sure the window can receive key events
-        window.makeKey()
+        // Use a small delay to ensure proper window setup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            window.makeKeyAndOrderFront(nil)
+            print("ScreenSelectionWindowManager: Selection window is now active")
+        }
         
         self.selectionWindow = window
     }

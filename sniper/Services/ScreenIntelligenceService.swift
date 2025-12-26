@@ -55,17 +55,23 @@ class ScreenIntelligenceService: ObservableObject {
     }
     
     func processScreenRegion(_ region: CaptureRegion) async {
+        print("ScreenIntelligenceService: Starting processing for region: \(region.rect)")
         isCapturing = true
         
         do {
+            print("ScreenIntelligenceService: Starting screen capture for region: \(region.rect)")
+            
             // 1. Capture screenshot
             let screenshot = try await captureScreenshot(region)
+            print("ScreenIntelligenceService: Screenshot captured successfully, size: \(screenshot.width)x\(screenshot.height)")
             
             // 2. Preprocess image for better OCR
             let preprocessedImage = imagePreprocessor.preprocessForOCR(screenshot) ?? screenshot
+            print("ScreenIntelligenceService: Image preprocessing completed")
             
             // 3. Perform OCR
             var ocrResult = try await ocrEngine.recognize(image: preprocessedImage)
+            print("ScreenIntelligenceService: OCR completed with text: \(ocrResult.rawText.prefix(50))...")
             
             // 4. Classify content type
             let contentType = contentClassifier.classifyContent(text: ocrResult.rawText, image: preprocessedImage)
@@ -75,12 +81,15 @@ class ScreenIntelligenceService: ObservableObject {
                 confidence: ocrResult.confidence,
                 contentType: contentType
             )
+            print("ScreenIntelligenceService: Content classified as: \(contentType)")
             
             // 5. Generate structured output
             let structuredOutput = outputGenerator.generateOutput(from: ocrResult, contentType: contentType)
+            print("ScreenIntelligenceService: Structured output generated")
             
             // 6. Copy to clipboard
             copyToClipboard(structuredOutput.processedText)
+            print("ScreenIntelligenceService: Text copied to clipboard")
             
             // 7. Create thumbnail and add to history
             let thumbnailData = createThumbnail(from: screenshot)
@@ -94,19 +103,55 @@ class ScreenIntelligenceService: ObservableObject {
             
             captureHistory.insert(historyItem, at: 0)
             lastResult = structuredOutput
+            print("ScreenIntelligenceService: Added to history")
             
             // 8. Show success notification
             NotificationManager.shared.showCaptureSuccess(
                 contentType: contentType,
                 textLength: structuredOutput.processedText.count
             )
+            print("ScreenIntelligenceService: Capture completed successfully")
             
         } catch {
-            print("Error processing screen region: \(error)")
+            print("ScreenIntelligenceService: Error processing screen region: \(error)")
+            
+            // Show more specific error messages
+            let errorMessage: String
+            if let captureError = error as? CaptureError {
+                errorMessage = captureError.localizedDescription
+                print("ScreenIntelligenceService: CaptureError: \(captureError)")
+            } else {
+                errorMessage = "An unexpected error occurred: \(error.localizedDescription)"
+                print("ScreenIntelligenceService: Unexpected error: \(error)")
+            }
+            
+            // Show error notification
             NotificationManager.shared.showCaptureError(error)
+            
+            // Also show an alert for critical errors
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "Screen Capture Failed"
+                alert.informativeText = errorMessage
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                
+                if errorMessage.contains("permission") {
+                    alert.addButton(withTitle: "Open System Preferences")
+                }
+                
+                let response = alert.runModal()
+                if response == .alertSecondButtonReturn {
+                    // Open System Preferences to Screen Recording
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
         }
         
         isCapturing = false
+        print("ScreenIntelligenceService: Processing completed, isCapturing set to false")
     }
     
     // MARK: - Private Methods
