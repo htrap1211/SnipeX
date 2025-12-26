@@ -9,6 +9,7 @@ import Foundation
 import AppKit
 import SwiftUI
 import UserNotifications
+import Combine
 
 class NotificationManager: ObservableObject {
     static let shared = NotificationManager()

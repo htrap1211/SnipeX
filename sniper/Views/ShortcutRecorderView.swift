@@ -52,7 +52,7 @@ struct ShortcutRecorderView: View {
     
     private func toggleRecording() {
         isRecording.toggle()
-        if !isRecording && let recorded = recordedShortcut {
+        if !isRecording, let recorded = recordedShortcut {
             shortcut = recorded
             recordedShortcut = nil
         }
@@ -217,7 +217,7 @@ extension KeyboardShortcut: RawRepresentable {
 }
 
 #Preview {
-    @State var shortcut = KeyboardShortcut.default
+    @Previewable @State var shortcut = KeyboardShortcut.default
     return ShortcutRecorderView(shortcut: $shortcut)
         .padding()
 }

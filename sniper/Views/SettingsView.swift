@@ -39,7 +39,7 @@ struct SettingsView: View {
                                     .frame(width: 140, alignment: .leading)
                                 
                                 ShortcutRecorderView(shortcut: $globalShortcut)
-                                    .onChange(of: globalShortcut) { newShortcut in
+                                    .onChange(of: globalShortcut) { _, newShortcut in
                                         shortcutManager.currentShortcut = newShortcut
                                     }
                                 

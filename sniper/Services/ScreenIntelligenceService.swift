@@ -22,6 +22,11 @@ class ScreenIntelligenceService: ObservableObject {
     private let outputGenerator: StructuredOutputGenerator
     private let screenshotCapture: ScreenshotCapture
     
+    // Public access for batch processing
+    var batchOCREngine: OCREngine { ocrEngine }
+    var batchImagePreprocessor: ImagePreprocessor { imagePreprocessor }
+    var batchContentClassifier: ContentClassifier { contentClassifier }
+    
     // Language setting observer
     private var languageObserver: AnyCancellable?
     
@@ -93,7 +98,7 @@ class ScreenIntelligenceService: ObservableObject {
             // 8. Show success notification
             NotificationManager.shared.showCaptureSuccess(
                 contentType: contentType,
-                textLength: structuredOutput.formattedText.count
+                textLength: structuredOutput.processedText.count
             )
             
         } catch {

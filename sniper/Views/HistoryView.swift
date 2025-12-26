@@ -232,10 +232,11 @@ struct HistoryItemRow: View {
     private func exportItem() {
         // Convert history item to StructuredOutput for export
         let structuredOutput = StructuredOutput(
+            originalText: item.extractedText,
+            processedText: item.extractedText,
             contentType: item.contentType,
-            rawText: item.extractedText,
-            formattedText: item.extractedText, // Could be enhanced with formatting
-            confidence: 0.95 // Default confidence for history items
+            format: .plainText,
+            metadata: [:]
         )
         
         let suggestedName = "Capture_\(DateFormatter.filenameSafe.string(from: item.timestamp))"

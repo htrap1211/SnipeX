@@ -9,6 +9,7 @@ import Foundation
 import CoreGraphics
 import AppKit
 import SwiftUI
+import Combine
 
 @MainActor
 class BatchProcessor: ObservableObject {
@@ -72,7 +73,8 @@ class BatchProcessor: ObservableObject {
     
     func processFiles(_ urls: [URL]) async {
         let images = urls.compactMap { url -> NSImage? in
-            guard url.pathExtension.lowercased() ~= ["png", "jpg", "jpeg", "tiff", "bmp", "gif"] else { return nil }
+            let validExtensions = ["png", "jpg", "jpeg", "tiff", "bmp", "gif"]
+            guard validExtensions.contains(url.pathExtension.lowercased()) else { return nil }
             return NSImage(contentsOf: url)
         }
         
@@ -92,9 +94,9 @@ class BatchProcessor: ObservableObject {
         }
         
         // Use the same processing pipeline as regular captures
-        let preprocessedImage = screenIntelligence.imagePreprocessor.preprocessForOCR(cgImage) ?? cgImage
-        let ocrResult = try await screenIntelligence.ocrEngine.recognize(image: preprocessedImage)
-        let contentType = screenIntelligence.contentClassifier.classifyContent(text: ocrResult.rawText, image: preprocessedImage)
+        let preprocessedImage = screenIntelligence.batchImagePreprocessor.preprocessForOCR(cgImage) ?? cgImage
+        let ocrResult = try await screenIntelligence.batchOCREngine.recognize(image: preprocessedImage)
+        let contentType = screenIntelligence.batchContentClassifier.classifyContent(text: ocrResult.rawText, image: preprocessedImage)
         
         return BatchResult(
             index: index,
@@ -203,13 +205,5 @@ enum BatchProcessingError: LocalizedError {
         case .processingFailed:
             return "Failed to process image"
         }
-    }
-}
-
-// MARK: - Array Extension
-
-extension Array where Element == String {
-    static func ~= (pattern: [String], value: String) -> Bool {
-        return pattern.contains(value)
     }
 }

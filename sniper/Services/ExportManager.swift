@@ -131,7 +131,7 @@ class ExportManager {
     // MARK: - Format-Specific Export Methods
     
     private func exportAsPlainText(_ content: StructuredOutput) throws -> Data {
-        let text = content.formattedText
+        let text = content.processedText
         guard let data = text.data(using: .utf8) else {
             throw ExportError.encodingFailed
         }
@@ -139,7 +139,7 @@ class ExportManager {
     }
     
     private func exportAsPDF(_ content: StructuredOutput) throws -> Data {
-        let text = content.formattedText
+        let text = content.processedText
         
         // Create attributed string with proper formatting
         let attributes: [NSAttributedString.Key: Any] = [
@@ -153,8 +153,8 @@ class ExportManager {
         let pdfData = NSMutableData()
         let consumer = CGDataConsumer(data: pdfData)!
         
-        let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792) // Letter size
-        let context = CGContext(consumer: consumer, mediaBox: &pageRect.mutableCopy().pointee, nil)!
+        var pageRect = CGRect(x: 0, y: 0, width: 612, height: 792) // Letter size
+        let context = CGContext(consumer: consumer, mediaBox: &pageRect, nil)!
         
         context.beginPDFPage(nil)
         
@@ -173,7 +173,7 @@ class ExportManager {
     }
     
     private func exportAsRTF(_ content: StructuredOutput) throws -> Data {
-        let text = content.formattedText
+        let text = content.processedText
         
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12),
@@ -183,11 +183,11 @@ class ExportManager {
         let attributedString = NSAttributedString(string: text, attributes: attributes)
         
         let range = NSRange(location: 0, length: attributedString.length)
-        return try attributedString.data(from: range, documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf])
+        return try attributedString.data(from: range, documentAttributes: [NSAttributedString.DocumentAttributeKey.documentType: NSAttributedString.DocumentType.rtf])
     }
     
     private func exportAsHTML(_ content: StructuredOutput) throws -> Data {
-        let text = content.formattedText
+        let text = content.processedText
         let escapedText = text.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
@@ -221,8 +221,8 @@ class ExportManager {
     }
     
     private func exportAsCSV(_ content: StructuredOutput) throws -> Data {
-        // For CSV, use the structured text if it's table data, otherwise create simple CSV
-        let text = content.contentType == .table ? content.formattedText : content.rawText
+        // For CSV, use the processed text if it's table data, otherwise create simple CSV
+        let text = content.contentType == .table ? content.processedText : content.originalText
         
         guard let data = text.data(using: .utf8) else {
             throw ExportError.encodingFailed
@@ -233,9 +233,9 @@ class ExportManager {
     private func exportAsJSON(_ content: StructuredOutput) throws -> Data {
         let exportData: [String: Any] = [
             "contentType": content.contentType.rawValue,
-            "rawText": content.rawText,
-            "formattedText": content.formattedText,
-            "confidence": content.confidence,
+            "originalText": content.originalText,
+            "processedText": content.processedText,
+            "format": content.format.rawValue,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
             "metadata": [
                 "exportedBy": "SnipeX",
