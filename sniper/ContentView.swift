@@ -14,11 +14,13 @@ struct ContentView: View {
     
     enum Tab: String, CaseIterable {
         case history = "History"
+        case batch = "Batch"
         case settings = "Settings"
         
         var icon: String {
             switch self {
             case .history: return "clock.arrow.circlepath"
+            case .batch: return "photo.stack"
             case .settings: return "gear"
             }
         }
@@ -75,6 +77,8 @@ struct ContentView: View {
                 switch selectedTab {
                 case .history:
                     HistoryView(service: screenIntelligence)
+                case .batch:
+                    BatchProcessingView(screenIntelligence: screenIntelligence)
                 case .settings:
                     SettingsView()
                 }
@@ -87,6 +91,11 @@ struct ContentView: View {
         .onDisappear {
             shortcutManager.unregisterGlobalShortcut()
         }
+        .overlay(
+            // Toast notifications overlay
+            ToastContainer()
+                .allowsHitTesting(false)
+        )
     }
     
     private func startCapture() {

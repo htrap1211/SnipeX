@@ -13,6 +13,9 @@ struct SettingsView: View {
     @AppStorage("showNotifications") private var showNotifications: Bool = true
     @AppStorage("autoClipboard") private var autoClipboard: Bool = true
     @AppStorage("aiEnhancementEnabled") private var aiEnhancementEnabled: Bool = false
+    @AppStorage("globalShortcut") private var globalShortcut: KeyboardShortcut = KeyboardShortcut.default
+    
+    @StateObject private var shortcutManager = GlobalShortcutManager()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -35,19 +38,12 @@ struct SettingsView: View {
                                 Text("Keyboard Shortcut:")
                                     .frame(width: 140, alignment: .leading)
                                 
-                                Text("⌘⇧2")
-                                    .font(.system(.body, design: .monospaced))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color(NSColor.controlBackgroundColor))
-                                    .cornerRadius(4)
+                                ShortcutRecorderView(shortcut: $globalShortcut)
+                                    .onChange(of: globalShortcut) { newShortcut in
+                                        shortcutManager.currentShortcut = newShortcut
+                                    }
                                 
                                 Spacer()
-                                
-                                Button("Change") {
-                                    // TODO: Implement shortcut customization
-                                }
-                                .disabled(true) // For MVP
                             }
                             
                             Toggle("Auto-copy to clipboard", isOn: $autoClipboard)
@@ -63,13 +59,10 @@ struct SettingsView: View {
                                     .frame(width: 140, alignment: .leading)
                                 
                                 Picker("Language", selection: $ocrLanguage) {
-                                    Text("English (US)").tag("en-US")
-                                    Text("English (UK)").tag("en-GB")
-                                    Text("Spanish").tag("es")
-                                    Text("French").tag("fr")
-                                    Text("German").tag("de")
-                                    Text("Chinese (Simplified)").tag("zh-Hans")
-                                    Text("Japanese").tag("ja")
+                                    ForEach(Array(OCREngineFactory.supportedLanguages.keys.sorted()), id: \.self) { languageCode in
+                                        Text(OCREngineFactory.languageDisplayName(for: languageCode))
+                                            .tag(languageCode)
+                                    }
                                 }
                                 .pickerStyle(.menu)
                                 .frame(maxWidth: 200)

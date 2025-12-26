@@ -2,13 +2,14 @@
 //  GlobalShortcutManager.swift
 //  sniper
 //
-//  Global keyboard shortcut handling
+//  Global keyboard shortcut handling with customization support
 //
 
 import Foundation
 import AppKit
 import Carbon
 import Combine
+import SwiftUI
 
 class GlobalShortcutManager: ObservableObject {
     private var eventMonitor: Any?
@@ -16,15 +17,29 @@ class GlobalShortcutManager: ObservableObject {
     private let hotKeyID: EventHotKeyID = EventHotKeyID(signature: OSType(0x53495052), id: 1) // 'SIPR'
     private var eventHandlerRef: EventHandlerRef?
     
+    @AppStorage("globalShortcut") private var storedShortcut: KeyboardShortcut = KeyboardShortcut.default
+    
     var onShortcutTriggered: (() -> Void)?
     
+    var currentShortcut: KeyboardShortcut {
+        get { storedShortcut }
+        set {
+            storedShortcut = newValue
+            // Re-register with new shortcut
+            registerGlobalShortcut()
+        }
+    }
+    
     func registerGlobalShortcut() {
+        registerGlobalShortcut(with: currentShortcut)
+    }
+    
+    func registerGlobalShortcut(with shortcut: KeyboardShortcut) {
         // Unregister any existing shortcut first
         unregisterGlobalShortcut()
         
-        // Register Cmd+Shift+2 (similar to screenshot shortcut)
-        let keyCode: UInt32 = 19 // Key code for '2'
-        let modifiers: UInt32 = UInt32(cmdKey | shiftKey)
+        let keyCode = UInt32(shortcut.keyCode)
+        let modifiers = shortcut.carbonModifiers
         
         var hotKeyRef: EventHotKeyRef?
         let status = RegisterEventHotKey(
@@ -39,6 +54,7 @@ class GlobalShortcutManager: ObservableObject {
         if status == noErr {
             self.hotKeyRef = hotKeyRef
             installEventHandler()
+            print("Successfully registered global shortcut: \(shortcut.displayString)")
         } else {
             print("Failed to register global shortcut: \(status)")
         }

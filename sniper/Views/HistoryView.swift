@@ -191,12 +191,21 @@ struct HistoryItemRow: View {
             Spacer()
             
             // Copy Button
-            Button(action: onCopy) {
-                Image(systemName: "doc.on.doc")
-                    .foregroundColor(.accentColor)
+            HStack(spacing: 8) {
+                Button(action: onCopy) {
+                    Image(systemName: "doc.on.doc")
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
+                
+                Button(action: { exportItem() }) {
+                    Image(systemName: "square.and.arrow.up")
+                        .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help("Export to file")
             }
-            .buttonStyle(.plain)
-            .help("Copy to clipboard")
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
@@ -218,6 +227,19 @@ struct HistoryItemRow: View {
         case .code: return .purple
         case .math: return .orange
         }
+    }
+    
+    private func exportItem() {
+        // Convert history item to StructuredOutput for export
+        let structuredOutput = StructuredOutput(
+            contentType: item.contentType,
+            rawText: item.extractedText,
+            formattedText: item.extractedText, // Could be enhanced with formatting
+            confidence: 0.95 // Default confidence for history items
+        )
+        
+        let suggestedName = "Capture_\(DateFormatter.filenameSafe.string(from: item.timestamp))"
+        ExportManager.shared.showExportDialog(for: structuredOutput, suggestedName: suggestedName)
     }
 }
 

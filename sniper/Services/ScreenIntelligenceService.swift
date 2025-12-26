@@ -16,11 +16,14 @@ class ScreenIntelligenceService: ObservableObject {
     @Published var lastResult: StructuredOutput?
     @Published var captureHistory: [CaptureHistoryItem] = []
     
-    private let ocrEngine: OCREngine
+    private var ocrEngine: OCREngine
     private let imagePreprocessor: ImagePreprocessor
     private let contentClassifier: ContentClassifier
     private let outputGenerator: StructuredOutputGenerator
     private let screenshotCapture: ScreenshotCapture
+    
+    // Language setting observer
+    private var languageObserver: AnyCancellable?
     
     init() {
         self.ocrEngine = OCREngineFactory.createDefault()
@@ -28,6 +31,22 @@ class ScreenIntelligenceService: ObservableObject {
         self.contentClassifier = ContentClassifier()
         self.outputGenerator = StructuredOutputGenerator()
         self.screenshotCapture = ScreenshotCapture()
+        
+        // Observe language changes
+        setupLanguageObserver()
+    }
+    
+    private func setupLanguageObserver() {
+        languageObserver = UserDefaults.standard.publisher(for: \.ocrLanguage)
+            .sink { [weak self] newLanguage in
+                self?.updateOCRLanguage(newLanguage)
+            }
+    }
+    
+    private func updateOCRLanguage(_ languageCode: String) {
+        if let languages = OCREngineFactory.supportedLanguages[languageCode] {
+            ocrEngine = OCREngineFactory.create(with: languages)
+        }
     }
     
     func processScreenRegion(_ region: CaptureRegion) async {
@@ -71,12 +90,15 @@ class ScreenIntelligenceService: ObservableObject {
             captureHistory.insert(historyItem, at: 0)
             lastResult = structuredOutput
             
-            // 8. Show notification
-            showNotification(for: structuredOutput)
+            // 8. Show success notification
+            NotificationManager.shared.showCaptureSuccess(
+                contentType: contentType,
+                textLength: structuredOutput.formattedText.count
+            )
             
         } catch {
             print("Error processing screen region: \(error)")
-            showErrorNotification(error)
+            NotificationManager.shared.showCaptureError(error)
         }
         
         isCapturing = false
