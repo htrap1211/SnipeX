@@ -13,6 +13,7 @@ struct ShortcutRecorderView: View {
     @Binding var shortcut: KeyboardShortcut
     @State private var isRecording = false
     @State private var recordedShortcut: KeyboardShortcut?
+    @State private var eventMonitor: Any?
     
     var body: some View {
         HStack {
@@ -46,21 +47,35 @@ struct ShortcutRecorderView: View {
             }
         }
         .onAppear {
-            setupKeyEventMonitor()
+            // Don't set up monitoring on appear to avoid conflicts
+        }
+        .onDisappear {
+            cleanupEventMonitor()
         }
     }
     
     private func toggleRecording() {
-        isRecording.toggle()
-        if !isRecording, let recorded = recordedShortcut {
-            shortcut = recorded
-            recordedShortcut = nil
+        if isRecording {
+            // Stop recording
+            isRecording = false
+            cleanupEventMonitor()
+            if let recorded = recordedShortcut {
+                shortcut = recorded
+                recordedShortcut = nil
+            }
+        } else {
+            // Start recording
+            isRecording = true
+            setupKeyEventMonitor()
         }
     }
     
     private func setupKeyEventMonitor() {
-        NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            guard isRecording else { return event }
+        // Clean up any existing monitor first
+        cleanupEventMonitor()
+        
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
+            guard self.isRecording else { return event }
             
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let keyCode = event.keyCode
@@ -70,11 +85,21 @@ struct ShortcutRecorderView: View {
             
             // Create shortcut from event
             if let shortcut = KeyboardShortcut.from(keyCode: keyCode, modifiers: modifiers) {
-                recordedShortcut = shortcut
-                isRecording = false
+                DispatchQueue.main.async {
+                    self.recordedShortcut = shortcut
+                    self.isRecording = false
+                    self.cleanupEventMonitor()
+                }
             }
             
             return nil // Consume the event
+        }
+    }
+    
+    private func cleanupEventMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
     }
 }

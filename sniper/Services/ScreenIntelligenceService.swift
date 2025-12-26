@@ -153,22 +153,4 @@ class ScreenIntelligenceService: ObservableObject {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else { return nil }
         return frontmostApp.localizedName
     }
-    
-    private func showNotification(for output: StructuredOutput) {
-        let notification = NSUserNotification()
-        notification.title = "Text Extracted"
-        notification.informativeText = "Captured \(output.contentType.displayName.lowercased()) • \(output.processedText.prefix(50))..."
-        notification.soundName = nil // Silent notification
-        
-        NSUserNotificationCenter.default.deliver(notification)
-    }
-    
-    private func showErrorNotification(_ error: Error) {
-        let notification = NSUserNotification()
-        notification.title = "Capture Failed"
-        notification.informativeText = error.localizedDescription
-        notification.soundName = NSUserNotificationDefaultSoundName
-        
-        NSUserNotificationCenter.default.deliver(notification)
-    }
 }

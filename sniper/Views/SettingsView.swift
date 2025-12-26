@@ -15,8 +15,6 @@ struct SettingsView: View {
     @AppStorage("aiEnhancementEnabled") private var aiEnhancementEnabled: Bool = false
     @AppStorage("globalShortcut") private var globalShortcut: KeyboardShortcut = KeyboardShortcut.default
     
-    @StateObject private var shortcutManager = GlobalShortcutManager()
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Header
@@ -39,9 +37,6 @@ struct SettingsView: View {
                                     .frame(width: 140, alignment: .leading)
                                 
                                 ShortcutRecorderView(shortcut: $globalShortcut)
-                                    .onChange(of: globalShortcut) { _, newShortcut in
-                                        shortcutManager.currentShortcut = newShortcut
-                                    }
                                 
                                 Spacer()
                             }

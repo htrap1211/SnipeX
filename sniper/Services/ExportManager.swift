@@ -8,6 +8,7 @@
 import Foundation
 import AppKit
 import UniformTypeIdentifiers
+import UserNotifications
 
 class ExportManager {
     
@@ -109,10 +110,17 @@ class ExportManager {
                 try self.exportContent(content, format: selectedFormat, to: finalURL)
                 
                 // Show success notification
-                let notification = NSUserNotification()
-                notification.title = "Export Successful"
-                notification.informativeText = "Capture exported to \(finalURL.lastPathComponent)"
-                NSUserNotificationCenter.default.deliver(notification)
+                let content = UNMutableNotificationContent()
+                content.title = "Export Successful"
+                content.body = "Capture exported to \(finalURL.lastPathComponent)"
+                content.sound = .default
+                
+                let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+                UNUserNotificationCenter.current().add(request) { error in
+                    if let error = error {
+                        print("Failed to show notification: \(error)")
+                    }
+                }
                 
                 // Reveal in Finder
                 NSWorkspace.shared.activateFileViewerSelecting([finalURL])
