@@ -2,7 +2,7 @@
 //  sniperApp.swift
 //  sniper
 //
-//  Created by Parth Rathi on 12/26/25.
+//  Screen Intelligence App
 //
 
 import SwiftUI
@@ -12,6 +12,20 @@ struct sniperApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+        }
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified)
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                Button("New Capture") {
+                    // Trigger capture from menu
+                }
+                .keyboardShortcut("2", modifiers: [.command, .shift])
+            }
+        }
+        
+        Settings {
+            SettingsView()
         }
     }
 }

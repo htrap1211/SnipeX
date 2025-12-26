@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Screen Intelligence needs screen recording permission to capture text from your screen.</string>
+	<key>NSScreenCaptureDescription</key>
+	<string>Screen Intelligence captures screenshots to extract text using OCR technology.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Screen Intelligence needs accessibility permission to detect the frontmost application.</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>CFBundleDisplayName</key>
+	<string>Screen Intelligence</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+</dict>
+</plist>
