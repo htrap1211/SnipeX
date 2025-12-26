@@ -228,26 +228,29 @@ struct KeyboardShortcut: Codable, Equatable {
 
 extension KeyboardShortcut: RawRepresentable {
     public var rawValue: String {
-        guard let data = try? JSONEncoder().encode(self),
-              let string = String(data: data, encoding: .utf8) else {
-            // Return a safe default if encoding fails
-            return "default"
-        }
-        return string
+        // Use a simple string format instead of JSON
+        return "\(keyCode):\(modifiers.rawValue)"
     }
     
     public init?(rawValue: String) {
         // Handle the default case
-        if rawValue == "default" {
+        if rawValue == "default" || rawValue.isEmpty {
             self = KeyboardShortcut.default
             return
         }
         
-        guard let data = rawValue.data(using: .utf8),
-              let shortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data) else {
-            return nil
+        // Parse the simple format
+        let components = rawValue.split(separator: ":")
+        guard components.count == 2,
+              let keyCode = UInt16(components[0]),
+              let modifierRawValue = UInt(components[1]) else {
+            // Fallback to default if parsing fails
+            self = KeyboardShortcut.default
+            return
         }
-        self = shortcut
+        
+        let modifiers = NSEvent.ModifierFlags(rawValue: modifierRawValue)
+        self.init(keyCode: keyCode, modifiers: modifiers)
     }
 }
 

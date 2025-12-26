@@ -15,7 +15,31 @@ struct SettingsView: View {
     @AppStorage("aiEnhancementEnabled") private var aiEnhancementEnabled: Bool = false
     @AppStorage("globalShortcut") private var globalShortcut: KeyboardShortcut = KeyboardShortcut.default
     
+    @State private var isLoading = true
+    
     var body: some View {
+        Group {
+            if isLoading {
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading Settings...")
+                        .padding(.top)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                settingsContent
+            }
+        }
+        .onAppear {
+            // Small delay to ensure everything is initialized
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isLoading = false
+            }
+        }
+    }
+    
+    private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Header
             VStack(alignment: .leading, spacing: 8) {
@@ -54,8 +78,8 @@ struct SettingsView: View {
                                     .frame(width: 140, alignment: .leading)
                                 
                                 Picker("Language", selection: $ocrLanguage) {
-                                    ForEach(Array(OCREngineFactory.supportedLanguages.keys.sorted()), id: \.self) { languageCode in
-                                        Text(OCREngineFactory.languageDisplayName(for: languageCode))
+                                    ForEach(getSupportedLanguages(), id: \.self) { languageCode in
+                                        Text(getLanguageDisplayName(for: languageCode))
                                             .tag(languageCode)
                                     }
                                 }
@@ -141,6 +165,15 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+    
+    // Helper methods to safely access OCREngineFactory
+    private func getSupportedLanguages() -> [String] {
+        return Array(OCREngineFactory.supportedLanguages.keys.sorted())
+    }
+    
+    private func getLanguageDisplayName(for code: String) -> String {
+        return OCREngineFactory.languageDisplayName(for: code)
     }
 }
 
