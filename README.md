@@ -19,6 +19,19 @@
 
 ---
 
+## 📥 Download & Installation
+
+### Quick Download
+**[⬇️ Download SnipeX v1.0 DMG](https://github.com/htrap1211/SnipeX/releases/latest)**
+
+### Installation Steps
+1. Download `SnipeX-v1.0.dmg` from the releases page
+2. Open the DMG file
+3. Drag `SnipeX.app` to your Applications folder
+4. Launch SnipeX from Applications or Launchpad
+5. Grant Screen Recording permission when prompted
+6. Press `⌘⇧2` to start capturing text!
+
 ## 🎯 **What is SnipeX?**
 
 SnipeX is a powerful macOS application that revolutionizes screen text extraction. Unlike basic OCR tools, SnipeX intelligently detects content types and provides structured output formats, making it perfect for developers, researchers, and professionals who work with diverse screen content.
