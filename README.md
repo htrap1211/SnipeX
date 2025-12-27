@@ -43,6 +43,23 @@ SnipeX is a powerful macOS application that revolutionizes screen text extractio
 - **Content Classification**: Automatically detects text, tables, code, and math
 - **Smart Output**: Converts content to optimal formats automatically
 
+### **🚀 Quick Preview Window (NEW!)**
+- **Review Before Copy**: Preview OCR results in a floating window before copying
+- **Text Editing**: Edit extracted text directly in the preview
+- **Format Selection**: Choose from multiple output formats (Plain Text, Markdown, CSV, JSON, LaTeX)
+- **Export Options**: Save results to files in various formats
+- **Visual Feedback**: See thumbnails and text statistics
+- **Keyboard Shortcuts**: `⌘+Return` to copy, `Escape` to cancel
+- **Toggle Setting**: Can be enabled/disabled in Settings (enabled by default)
+
+### **🎛️ Flexible App Display (NEW!)**
+- **Menu Bar Only**: Clean, minimal presence (default and recommended)
+- **Dock Only**: Traditional app behavior for users who prefer it
+- **Both Locations**: Maximum accessibility with icons in both menu bar and Dock
+- **Easy Switching**: Change modes in Settings → App Appearance
+- **Instant Restart**: Built-in restart functionality to apply changes
+- **Smart Defaults**: Automatically chooses the best mode for new users
+
 ### **📊 Content Types & Output Formats**
 
 | Content Type | Detection | Output Format | Example |

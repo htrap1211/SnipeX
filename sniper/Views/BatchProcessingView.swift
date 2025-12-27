@@ -357,6 +357,6 @@ struct BatchResultRow: View {
 }
 
 #Preview {
-    BatchProcessingView(screenIntelligence: ScreenIntelligenceService())
+    BatchProcessingView(screenIntelligence: ScreenIntelligenceService.shared)
         .frame(width: 600, height: 800)
 }

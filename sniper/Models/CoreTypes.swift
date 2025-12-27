@@ -26,6 +26,37 @@ enum ContentType: String, CaseIterable {
     }
 }
 
+// MARK: - App Display Mode
+enum AppDisplayMode: String, CaseIterable {
+    case menuBarOnly = "menuBarOnly"
+    case dockOnly = "dockOnly"
+    case both = "both"
+    
+    var displayName: String {
+        switch self {
+        case .menuBarOnly: return "Menu Bar Only"
+        case .dockOnly: return "Dock Only"
+        case .both: return "Both Menu Bar & Dock"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .menuBarOnly: return "App appears only in the menu bar (recommended)"
+        case .dockOnly: return "App appears only in the Dock like traditional apps"
+        case .both: return "App appears in both menu bar and Dock"
+        }
+    }
+    
+    var activationPolicy: NSApplication.ActivationPolicy {
+        switch self {
+        case .menuBarOnly: return .accessory
+        case .dockOnly: return .regular
+        case .both: return .regular
+        }
+    }
+}
+
 // MARK: - Capture Region
 struct CaptureRegion {
     let rect: CGRect

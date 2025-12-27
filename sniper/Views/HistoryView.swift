@@ -245,6 +245,6 @@ struct HistoryItemRow: View {
 }
 
 #Preview {
-    HistoryView(service: ScreenIntelligenceService())
+    HistoryView(service: ScreenIntelligenceService.shared)
         .frame(width: 400, height: 600)
 }

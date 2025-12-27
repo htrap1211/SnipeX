@@ -12,6 +12,8 @@ import Combine
 
 @MainActor
 class ScreenIntelligenceService: ObservableObject {
+    static let shared = ScreenIntelligenceService()
+    
     @Published var isCapturing = false
     @Published var lastResult: StructuredOutput?
     @Published var captureHistory: [CaptureHistoryItem] = []
@@ -30,7 +32,7 @@ class ScreenIntelligenceService: ObservableObject {
     // Language setting observer
     private var languageObserver: AnyCancellable?
     
-    init() {
+    private init() {
         self.ocrEngine = OCREngineFactory.createDefault()
         self.imagePreprocessor = ImagePreprocessor()
         self.contentClassifier = ContentClassifier()
@@ -56,7 +58,11 @@ class ScreenIntelligenceService: ObservableObject {
     
     func processScreenRegion(_ region: CaptureRegion) async {
         print("ScreenIntelligenceService: Starting processing for region: \(region.rect)")
-        isCapturing = true
+        
+        // Ensure UI updates happen on the main thread
+        await MainActor.run {
+            isCapturing = true
+        }
         
         do {
             print("ScreenIntelligenceService: Starting screen capture for region: \(region.rect)")
@@ -87,28 +93,26 @@ class ScreenIntelligenceService: ObservableObject {
             let structuredOutput = outputGenerator.generateOutput(from: ocrResult, contentType: contentType)
             print("ScreenIntelligenceService: Structured output generated")
             
-            // 6. Copy to clipboard
+            // 6. Create thumbnail for history
+            let thumbnailData = createThumbnail(from: screenshot)
+            
+            // 7. Copy to clipboard directly
             copyToClipboard(structuredOutput.processedText)
             print("ScreenIntelligenceService: Text copied to clipboard")
             
-            // 7. Create thumbnail and add to history
-            let thumbnailData = createThumbnail(from: screenshot)
-            let historyItem = CaptureHistoryItem(
-                extractedText: structuredOutput.processedText,
+            // 8. Add to history
+            addToHistory(
+                text: structuredOutput.processedText,
                 contentType: contentType,
                 thumbnailData: thumbnailData,
-                appName: getFrontmostAppName(),
                 region: region.rect
             )
             
-            captureHistory.insert(historyItem, at: 0)
             lastResult = structuredOutput
-            print("ScreenIntelligenceService: Added to history")
             
-            // 8. Show success notification
-            NotificationManager.shared.showCaptureSuccess(
-                contentType: contentType,
-                textLength: structuredOutput.processedText.count
+            // 9. Show Dynamic Island-style notification
+            DynamicIslandNotificationManager.shared.showNotification(
+                message: "Text copied to clipboard"
             )
             print("ScreenIntelligenceService: Capture completed successfully")
             
@@ -150,11 +154,35 @@ class ScreenIntelligenceService: ObservableObject {
             }
         }
         
-        isCapturing = false
+        // Ensure UI updates happen on the main thread
+        await MainActor.run {
+            isCapturing = false
+        }
         print("ScreenIntelligenceService: Processing completed, isCapturing set to false")
     }
     
     // MARK: - Private Methods
+    
+    private func addToHistory(
+        text: String,
+        contentType: ContentType,
+        thumbnailData: Data?,
+        region: CGRect
+    ) {
+        let historyItem = CaptureHistoryItem(
+            extractedText: text,
+            contentType: contentType,
+            thumbnailData: thumbnailData,
+            appName: getFrontmostAppName(),
+            region: region
+        )
+        
+        // Ensure UI updates happen on the main thread
+        DispatchQueue.main.async {
+            self.captureHistory.insert(historyItem, at: 0)
+            print("ScreenIntelligenceService: Added to history on main thread")
+        }
+    }
     
     private func captureScreenshot(_ region: CaptureRegion) async throws -> CGImage {
         return try await screenshotCapture.captureRegion(region)

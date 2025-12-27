@@ -15,9 +15,46 @@ class NotificationManager: ObservableObject {
     static let shared = NotificationManager()
     
     @Published var currentToast: ToastMessage?
+    @Published var notificationPermissionGranted = false
     
     private init() {
-        requestNotificationPermission()
+        checkNotificationPermission()
+    }
+    
+    // MARK: - Permission Handling
+    
+    private func checkNotificationPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.notificationPermissionGranted = settings.authorizationStatus == .authorized
+                
+                if settings.authorizationStatus == .notDetermined {
+                    self.requestNotificationPermission()
+                }
+            }
+        }
+    }
+    
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                self.notificationPermissionGranted = granted
+                
+                if let error = error {
+                    print("Notification permission error: \(error)")
+                } else if !granted {
+                    print("Notification permission denied by user")
+                    // Show toast instead of system notification
+                    self.showToast("Notifications disabled. Enable in System Preferences for better experience.", type: .info, duration: 5.0)
+                }
+            }
+        }
+    }
+    
+    func requestPermissionIfNeeded() {
+        if !notificationPermissionGranted {
+            requestNotificationPermission()
+        }
     }
     
     // MARK: - Toast Notifications (In-App)
@@ -52,7 +89,13 @@ class NotificationManager: ObservableObject {
     // MARK: - System Notifications
     
     func showSystemNotification(title: String, body: String, identifier: String = UUID().uuidString) {
-        guard UserDefaults.standard.bool(forKey: "showNotifications") else { return }
+        // Check if notifications are enabled in settings and permissions are granted
+        guard UserDefaults.standard.bool(forKey: "showNotifications"),
+              notificationPermissionGranted else {
+            // Fall back to toast notification if system notifications aren't available
+            showToast("\(title): \(body)", type: .info)
+            return
+        }
         
         let content = UNMutableNotificationContent()
         content.title = title
@@ -64,6 +107,10 @@ class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("Failed to show notification: \(error)")
+                // Fall back to toast on error
+                DispatchQueue.main.async {
+                    self.showToast("\(title): \(body)", type: .info)
+                }
             }
         }
     }
@@ -74,11 +121,13 @@ class NotificationManager: ObservableObject {
         let message = "Captured \(contentType.displayName.lowercased()) (\(textLength) characters)"
         showSuccess(message)
         
-        // System notification for background captures
-        showSystemNotification(
-            title: "SnipeX Capture Complete",
-            body: message
-        )
+        // System notification for background captures (with fallback)
+        if notificationPermissionGranted {
+            showSystemNotification(
+                title: "SnipeX Capture Complete",
+                body: message
+            )
+        }
     }
     
     func showCaptureError(_ error: Error) {
@@ -88,16 +137,6 @@ class NotificationManager: ObservableObject {
     
     func showExportSuccess(filename: String) {
         showSuccess("Exported to \(filename)")
-    }
-    
-    // MARK: - Permission Handling
-    
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error = error {
-                print("Notification permission error: \(error)")
-            }
-        }
     }
 }
 

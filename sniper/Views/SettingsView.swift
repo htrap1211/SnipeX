@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage("ocrLanguage") private var ocrLanguage: String = "en-US"
     @AppStorage("showNotifications") private var showNotifications: Bool = true
     @AppStorage("autoClipboard") private var autoClipboard: Bool = true
+    @AppStorage("appDisplayMode") private var appDisplayMode: String = AppDisplayMode.menuBarOnly.rawValue
     @AppStorage("aiEnhancementEnabled") private var aiEnhancementEnabled: Bool = false
     @AppStorage("globalShortcut") private var globalShortcut: KeyboardShortcut = KeyboardShortcut.default
     
@@ -50,7 +51,66 @@ struct SettingsView: View {
                             }
                             
                             Toggle("Auto-copy to clipboard", isOn: $autoClipboard)
-                            Toggle("Show notifications", isOn: $showNotifications)
+                            
+                            HStack {
+                                Toggle("Show notifications", isOn: $showNotifications)
+                                
+                                if showNotifications && !NotificationManager.shared.notificationPermissionGranted {
+                                    Button("Enable in System Preferences") {
+                                        openNotificationSettings()
+                                    }
+                                    .buttonStyle(.link)
+                                    .font(.caption)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // App Appearance Settings
+                    SettingsSection(title: "App Appearance", icon: "app.badge") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Display Mode:")
+                                    .frame(width: 140, alignment: .leading)
+                                
+                                Picker("Display Mode", selection: $appDisplayMode) {
+                                    ForEach(AppDisplayMode.allCases, id: \.rawValue) { mode in
+                                        Text(mode.displayName).tag(mode.rawValue)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: 200)
+                                
+                                Spacer()
+                            }
+                            
+                            // Show description for selected mode
+                            if let selectedMode = AppDisplayMode(rawValue: appDisplayMode) {
+                                Text(selectedMode.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.leading, 140)
+                            }
+                            
+                            // Restart notice
+                            if appDisplayMode != AppDisplayMode.menuBarOnly.rawValue {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        Image(systemName: "info.circle.fill")
+                                            .foregroundColor(.orange)
+                                        Text("App restart required for display mode changes")
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                    }
+                                    
+                                    Button("Restart SnipeX Now") {
+                                        restartApp()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .controlSize(.small)
+                                }
+                                .padding(.leading, 140)
+                            }
                         }
                     }
                     
@@ -158,6 +218,42 @@ struct SettingsView: View {
     
     private func getLanguageDisplayName(for code: String) -> String {
         return OCREngineFactory.languageDisplayName(for: code)
+    }
+    
+    private func restartApp() {
+        // Show confirmation dialog
+        let alert = NSAlert()
+        alert.messageText = "Restart SnipeX"
+        alert.informativeText = "SnipeX will restart to apply the new display mode. Any unsaved work will be lost."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Restart Now")
+        alert.addButton(withTitle: "Cancel")
+        
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Get the app bundle path
+            let bundlePath = Bundle.main.bundlePath
+            
+            // Use NSWorkspace to relaunch the app
+            let task = Process()
+            task.launchPath = "/usr/bin/open"
+            task.arguments = [bundlePath]
+            
+            // Launch the new instance
+            task.launch()
+            
+            // Quit the current instance
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+    
+    private func openNotificationSettings() {
+        // Open System Preferences to Notifications
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
 

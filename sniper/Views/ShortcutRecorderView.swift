@@ -111,6 +111,7 @@ struct KeyboardShortcut: Codable, Equatable {
     let modifiers: NSEvent.ModifierFlags
     
     static let `default` = KeyboardShortcut(keyCode: 19, modifiers: [.command, .shift]) // ⌘⇧2
+    static let fallback = KeyboardShortcut(keyCode: 20, modifiers: [.command, .shift]) // ⌘⇧3
     
     var displayString: String {
         var result = ""

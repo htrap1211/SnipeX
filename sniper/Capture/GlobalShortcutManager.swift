@@ -57,6 +57,35 @@ class GlobalShortcutManager: ObservableObject {
             print("Successfully registered global shortcut: \(shortcut.displayString)")
         } else {
             print("Failed to register global shortcut: \(status)")
+            handleShortcutRegistrationError(status, shortcut: shortcut)
+        }
+    }
+    
+    private func handleShortcutRegistrationError(_ status: OSStatus, shortcut: KeyboardShortcut) {
+        let errorMessage: String
+        
+        switch status {
+        case -9878: // eventAlreadyPostedErr or hotkey already registered
+            errorMessage = "Shortcut \(shortcut.displayString) is already in use by another application"
+        case -50: // paramErr
+            errorMessage = "Invalid shortcut parameters"
+        case -108: // memFullErr
+            errorMessage = "Not enough memory to register shortcut"
+        default:
+            errorMessage = "Unknown error (\(status)) registering shortcut"
+        }
+        
+        print("Shortcut registration error: \(errorMessage)")
+        
+        // Try to register a fallback shortcut
+        if shortcut != KeyboardShortcut.fallback {
+            print("Attempting to register fallback shortcut...")
+            registerGlobalShortcut(with: KeyboardShortcut.fallback)
+        } else {
+            // Even fallback failed, show user notification
+            DispatchQueue.main.async {
+                NotificationManager.shared.showError("Could not register global shortcut. Please choose a different shortcut in Settings.")
+            }
         }
     }
     

@@ -148,6 +148,11 @@ class ScreenSelectionWindowManager {
             // Log more details about the error
             if let scError = error as? SCStreamError {
                 print("ScreenSelectionWindowManager: SCStreamError code: \(scError.code), description: \(scError.localizedDescription)")
+                
+                // Check for permission issues
+                if scError.code == .userDeclined {
+                    throw CaptureError.permissionDenied
+                }
             }
             
             throw error
@@ -173,8 +178,9 @@ class ScreenSelectionWindowManager {
             defer: false
         )
         
-        // Configure window to properly receive input
-        window.level = .screenSaver
+        // Configure window to be highly visible and receive input
+        // Use a very high window level to ensure it's above everything
+        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.screenSaverWindow)) + 1)
         window.backgroundColor = NSColor.clear
         window.isOpaque = false
         window.ignoresMouseEvents = false
@@ -182,6 +188,12 @@ class ScreenSelectionWindowManager {
         window.hasShadow = false
         window.canHide = false
         window.hidesOnDeactivate = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        
+        // Ensure the window can receive focus
+        window.makeFirstResponder(window.contentView)
+        
+        print("ScreenSelectionWindowManager: Window configured with level \(window.level.rawValue)")
         
         // Create the selection view
         let selectionView = TextSniperStyleSelectionView(
@@ -203,17 +215,41 @@ class ScreenSelectionWindowManager {
         
         window.contentView = selectionView
         
-        // Show the window with proper ordering
-        window.orderFrontRegardless()
+        // Store the window reference first
+        self.selectionWindow = window
         
-        // Make sure the window can receive key events
-        // Use a small delay to ensure proper window setup
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // Force the window to be visible and active with multiple attempts
+        print("ScreenSelectionWindowManager: Making window visible...")
+        
+        // First attempt - immediate
+        window.orderFrontRegardless()
+        window.makeKeyAndOrderFront(nil)
+        
+        // Ensure the app is active so the window can receive events
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Second attempt after app activation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            window.orderFrontRegardless()
             window.makeKeyAndOrderFront(nil)
-            print("ScreenSelectionWindowManager: Selection window is now active")
+            
+            // Force focus to the selection view
+            window.makeFirstResponder(selectionView)
+            
+            print("ScreenSelectionWindowManager: Selection window is now active and visible")
+            print("ScreenSelectionWindowManager: Window frame: \(window.frame)")
+            print("ScreenSelectionWindowManager: Window is visible: \(window.isVisible)")
+            print("ScreenSelectionWindowManager: Window is key: \(window.isKeyWindow)")
         }
         
-        self.selectionWindow = window
+        // Third attempt - final fallback
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if !window.isVisible {
+                print("ScreenSelectionWindowManager: Window still not visible, forcing final display")
+                window.orderFrontRegardless()
+                window.display()
+            }
+        }
     }
     
     private func hideSelectionWindow() {
@@ -307,8 +343,8 @@ class TextSniperStyleSelectionView: NSView {
         // Draw the captured screen image as background
         backgroundImage.draw(in: bounds)
         
-        // Draw dark overlay over everything
-        NSColor.black.withAlphaComponent(0.4).setFill()
+        // Draw dark overlay over everything with higher opacity for better visibility
+        NSColor.black.withAlphaComponent(0.8).setFill()
         bounds.fill()
         
         if isSelecting {
@@ -319,14 +355,34 @@ class TextSniperStyleSelectionView: NSView {
                 height: abs(currentPoint.y - startPoint.y)
             )
             
-            // Draw selection border (no clear area, just the border)
-            NSColor.systemBlue.setStroke()
+            // Clear the selected area to show the original image
+            NSColor.clear.setFill()
+            selectionRect.fill()
+            
+            // Redraw the original image in the selected area
+            let imageRect = CGRect(
+                x: selectionRect.origin.x,
+                y: selectionRect.origin.y,
+                width: selectionRect.width,
+                height: selectionRect.height
+            )
+            
+            backgroundImage.draw(in: imageRect, from: imageRect, operation: .sourceOver, fraction: 1.0)
+            
+            // Draw very bright selection border for maximum visibility
+            NSColor.systemYellow.setStroke()
             let path = NSBezierPath(rect: selectionRect)
-            path.lineWidth = 2.0
+            path.lineWidth = 4.0
             path.stroke()
             
+            // Add a secondary border for even better visibility
+            NSColor.white.setStroke()
+            let innerPath = NSBezierPath(rect: selectionRect.insetBy(dx: 2, dy: 2))
+            innerPath.lineWidth = 2.0
+            innerPath.stroke()
+            
             // Draw corner handles for better visibility
-            let handleSize: CGFloat = 8
+            let handleSize: CGFloat = 12
             let handles = [
                 CGPoint(x: selectionRect.minX, y: selectionRect.minY),
                 CGPoint(x: selectionRect.maxX, y: selectionRect.minY),
@@ -334,7 +390,8 @@ class TextSniperStyleSelectionView: NSView {
                 CGPoint(x: selectionRect.maxX, y: selectionRect.maxY)
             ]
             
-            NSColor.systemBlue.setFill()
+            NSColor.systemYellow.setFill()
+            NSColor.white.setStroke()
             for handle in handles {
                 let handleRect = CGRect(
                     x: handle.x - handleSize/2,
@@ -342,52 +399,67 @@ class TextSniperStyleSelectionView: NSView {
                     width: handleSize,
                     height: handleSize
                 )
-                NSBezierPath(ovalIn: handleRect).fill()
+                let handlePath = NSBezierPath(ovalIn: handleRect)
+                handlePath.fill()
+                handlePath.lineWidth = 3.0
+                handlePath.stroke()
             }
             
-            // Draw dimensions
+            // Draw dimensions with high contrast background
             let dimensionsText = String(format: "%.0f × %.0f", selectionRect.width, selectionRect.height)
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
-                .foregroundColor: NSColor.white
+                .font: NSFont.monospacedSystemFont(ofSize: 16, weight: .bold),
+                .foregroundColor: NSColor.black
             ]
             
             let attributedString = NSAttributedString(string: dimensionsText, attributes: attributes)
             let textSize = attributedString.size()
             let textRect = CGRect(
-                x: selectionRect.maxX - textSize.width - 10,
-                y: selectionRect.minY - textSize.height - 10,
-                width: textSize.width + 8,
-                height: textSize.height + 4
+                x: selectionRect.maxX - textSize.width - 20,
+                y: selectionRect.minY - textSize.height - 20,
+                width: textSize.width + 16,
+                height: textSize.height + 12
             )
             
-            // Background for dimensions
-            NSColor.black.withAlphaComponent(0.8).setFill()
-            NSBezierPath(roundedRect: textRect, xRadius: 4, yRadius: 4).fill()
+            // Bright background for dimensions
+            NSColor.systemYellow.setFill()
+            NSBezierPath(roundedRect: textRect, xRadius: 8, yRadius: 8).fill()
             
-            attributedString.draw(at: CGPoint(x: textRect.minX + 4, y: textRect.minY + 2))
+            // Black border for text background
+            NSColor.black.setStroke()
+            let textBorderPath = NSBezierPath(roundedRect: textRect, xRadius: 8, yRadius: 8)
+            textBorderPath.lineWidth = 2.0
+            textBorderPath.stroke()
+            
+            attributedString.draw(at: CGPoint(x: textRect.minX + 8, y: textRect.minY + 6))
         } else {
-            // Show instructions
-            let instructionText = "Click and drag to select an area • Press ESC to cancel"
+            // Show instructions with maximum visibility
+            let instructionText = "🎯 Click and drag to select area • Press ESC to cancel"
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 16, weight: .medium),
-                .foregroundColor: NSColor.white
+                .font: NSFont.systemFont(ofSize: 20, weight: .bold),
+                .foregroundColor: NSColor.black
             ]
             
             let attributedString = NSAttributedString(string: instructionText, attributes: attributes)
             let textSize = attributedString.size()
             let textRect = CGRect(
                 x: (bounds.width - textSize.width) / 2,
-                y: bounds.height - 60,
-                width: textSize.width,
-                height: textSize.height
+                y: bounds.height - 100,
+                width: textSize.width + 24,
+                height: textSize.height + 20
             )
             
-            // Background for instructions
-            NSColor.black.withAlphaComponent(0.8).setFill()
-            NSBezierPath(roundedRect: textRect.insetBy(dx: -10, dy: -5), xRadius: 8, yRadius: 8).fill()
+            // Very bright background for instructions
+            NSColor.systemYellow.setFill()
+            NSBezierPath(roundedRect: textRect, xRadius: 15, yRadius: 15).fill()
             
-            attributedString.draw(in: textRect)
+            // Black border for maximum contrast
+            NSColor.black.setStroke()
+            let instructionBorderPath = NSBezierPath(roundedRect: textRect, xRadius: 15, yRadius: 15)
+            instructionBorderPath.lineWidth = 3.0
+            instructionBorderPath.stroke()
+            
+            attributedString.draw(at: CGPoint(x: textRect.minX + 12, y: textRect.minY + 10))
         }
     }
     
