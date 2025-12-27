@@ -2,7 +2,7 @@
 //  sniperApp.swift
 //  sniper
 //
-//  Screen Intelligence App - Menu Bar Version
+//  Screen Intelligence App - Menu Bar & Dock Version
 //
 
 import SwiftUI
@@ -15,8 +15,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Ensure the app doesn't terminate when no windows are open
-        NSApp.setActivationPolicy(.accessory)
+        // Set activation policy to show in dock by default
+        NSApp.setActivationPolicy(.regular)
     }
 }
 
@@ -25,10 +25,10 @@ struct sniperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var menuBarManager = MenuBarManager()
     @StateObject private var globalShortcutManager = GlobalShortcutManager()
-    @AppStorage("appDisplayMode") private var appDisplayMode: String = AppDisplayMode.menuBarOnly.rawValue
+    @AppStorage("appDisplayMode") private var appDisplayMode: String = AppDisplayMode.both.rawValue
     
     init() {
-        // Setup for menu bar app
+        // Setup for menu bar and dock app
     }
     
     var body: some Scene {
